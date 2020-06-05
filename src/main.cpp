@@ -9,68 +9,30 @@
 #include <unordered_map>
 #include <vector>
 
+#include <shk.h>
+
 #define HI8(U16) (static_cast<uint8_t>((U16 & 0xFF00u) >> 8u))
 #define LO8(U16) (static_cast<uint8_t>(U16 & 0x00FFu))
 
-enum class Opcode : uint8_t {
-	noop    = 0b0000,
-	halt    = 0b0010,
-	die     = 0b0011,
-
-	load    = 0b0100,
-	store   = 0b0101,
-
-	move    = 0b1000,
-	add     = 0b1010,
-	compare = 0b1011,
-};
-
-struct Operand {
-	enum class Type : uint8_t {
-		imm = 0b0,
-		reg = 0b1,
-
-		mem,
-	};
-
-	Type type;
-	uint16_t value;
-};
-
-struct Command {
-	enum class Type : uint8_t {
-		eq = 0b0000,
-	};
-
-	Type type;
-	std::vector<Operand> operands;
-};
-
-struct Instruction {
-	Opcode opcode;
-	std::vector<Operand> operands;
-	std::vector<Command> commands;
-};
-
-std::ostream & operator<<(std::ostream &os, const Opcode opcode) {
+std::ostream & operator<<(std::ostream &os, const shk::opcode opcode) {
 	return os << static_cast<int>(opcode);
 }
 
-std::ostream & operator<<(std::ostream &os, const Operand::Type type) {
+std::ostream & operator<<(std::ostream &os, const shk::operand::type type) {
 	return os << static_cast<int>(type);
 }
 
-const std::unordered_map<std::string, Opcode> opcode_map {
-	{"NOP", Opcode::noop},
-	{"HLT", Opcode::halt},
-	{"DIE", Opcode::die},
+const std::unordered_map<std::string, shk::opcode> opcode_map {
+	{"NOP", shk::opcode::noop},
+	{"HLT", shk::opcode::halt},
+	{"DIE", shk::opcode::die},
 
-	{"LOD", Opcode::load},
-	{"STO", Opcode::store},
+	{"LOD", shk::opcode::load},
+	{"STO", shk::opcode::store},
 
-	{"MOV", Opcode::move},
-	{"ADD", Opcode::add},
-	{"CMP", Opcode::compare},
+	{"MOV", shk::opcode::move},
+	{"ADD", shk::opcode::add},
+	{"CMP", shk::opcode::compare},
 };
 
 std::vector<std::string_view> split(std::string_view sv, char delim) {
@@ -100,16 +62,16 @@ std::vector<std::string_view> split(std::string_view sv, char delim) {
 	return ret;
 }
 
-Operand process_operand(std::string_view operand_str) {
-	Operand operand;
+shk::operand process_operand(std::string_view operand_str) {
+	shk::operand operand;
 
 	switch(operand_str[0]) {
 	case '#':
-		operand.type = Operand::Type::imm;
+		operand.ty = shk::operand::type::imm;
 		operand.value = 0;
 		break;
 	case '$':
-		operand.type = Operand::Type::reg;
+		operand.ty = shk::operand::type::reg;
 		operand.value = 0;
 		break;
 	case '0':
@@ -122,7 +84,7 @@ Operand process_operand(std::string_view operand_str) {
 	case '7':
 	case '8':
 	case '9':
-		operand.type = Operand::Type::mem;
+		operand.ty = shk::operand::type::mem;
 		operand.value = 0;
 		break;
 	}
@@ -130,8 +92,8 @@ Operand process_operand(std::string_view operand_str) {
 	return operand;
 }
 
-std::vector<Instruction> process(std::istream &is) {
-	std::vector<Instruction> ret;
+std::vector<shk::instruction> process(std::istream &is) {
+	std::vector<shk::instruction> ret;
 
 	std::string line;
 	while(std::getline(is, line)) {
@@ -146,8 +108,8 @@ std::vector<Instruction> process(std::istream &is) {
 			return {};
 		}
 
-		Instruction instr;
-		instr.opcode = it->second;
+		shk::instruction instr;
+		instr.op = it->second;
 
 		std::string operand_str;
 		while(std::getline(lss, operand_str, ',')) {
@@ -164,8 +126,8 @@ std::vector<Instruction> process(std::istream &is) {
 			}
 
 			if(words[0][0] == '!') {
-				Command command;
-				command.type = Command::Type::eq;
+				shk::command command;
+				command.ty = shk::command::type::eq;
 				for(size_t w = 1; w < words.size(); ++w) {
 					command.operands.emplace_back(process_operand(words[w]));
 				}
@@ -181,10 +143,10 @@ std::vector<Instruction> process(std::istream &is) {
 	return ret;
 }
 
-void encode(std::ostream &os, const std::vector<Instruction> &instrs) {
+void encode(std::ostream &os, const std::vector<shk::instruction> &instrs) {
 	for(auto &instr : instrs) {
 		for(auto &command : instr.commands) {
-			uint16_t byte = static_cast<uint16_t>(command.type);
+			uint16_t byte = static_cast<uint16_t>(command.ty);
 			byte |= 1u << 15u;
 			std::cout << std::bitset<16>(byte) << ' ';
 			os << HI8(byte) << LO8(byte);
@@ -192,8 +154,8 @@ void encode(std::ostream &os, const std::vector<Instruction> &instrs) {
 			for(auto &operand : command.operands) {
 				uint16_t byte = operand.value;
 
-				if(operand.type != Operand::Type::mem) {
-					byte |= static_cast<uint16_t>(operand.type) << 15u;
+				if(operand.ty != shk::operand::type::mem) {
+					byte |= static_cast<uint16_t>(operand.ty) << 15u;
 				}
 
 				std::cout << std::bitset<16>(byte) << ' ';
@@ -201,15 +163,15 @@ void encode(std::ostream &os, const std::vector<Instruction> &instrs) {
 			}
 		}
 
-		uint16_t byte = static_cast<uint16_t>(instr.opcode);
+		uint16_t byte = static_cast<uint16_t>(instr.op);
 		std::cout << std::bitset<16>(byte);
 		os << HI8(byte) << LO8(byte);
 
 		for(auto &operand : instr.operands) {
 			uint16_t byte = operand.value;
 
-			if(operand.type != Operand::Type::mem) {
-				byte |= static_cast<uint16_t>(operand.type) << 15u;
+			if(operand.ty != shk::operand::type::mem) {
+				byte |= static_cast<uint16_t>(operand.ty) << 15u;
 			}
 
 			std::cout << ' ' << std::bitset<16>(byte);
