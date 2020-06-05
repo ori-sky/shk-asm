@@ -2,11 +2,15 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <bitset>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
+
+#define HI8(U16) (static_cast<uint8_t>((U16 & 0xFF00u) >> 8u))
+#define LO8(U16) (static_cast<uint8_t>(U16 & 0x00FFu))
 
 enum class Opcode : uint8_t {
 	noop    = 0b0000,
@@ -33,9 +37,19 @@ struct Operand {
 	uint16_t value;
 };
 
+struct Command {
+	enum class Type : uint8_t {
+		eq = 0b0000,
+	};
+
+	Type type;
+	std::vector<Operand> operands;
+};
+
 struct Instruction {
 	Opcode opcode;
 	std::vector<Operand> operands;
+	std::vector<Command> commands;
 };
 
 std::ostream & operator<<(std::ostream &os, const Opcode opcode) {
@@ -86,6 +100,36 @@ std::vector<std::string_view> split(std::string_view sv, char delim) {
 	return ret;
 }
 
+Operand process_operand(std::string_view operand_str) {
+	Operand operand;
+
+	switch(operand_str[0]) {
+	case '#':
+		operand.type = Operand::Type::imm;
+		operand.value = 0;
+		break;
+	case '$':
+		operand.type = Operand::Type::reg;
+		operand.value = 0;
+		break;
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	case '8':
+	case '9':
+		operand.type = Operand::Type::mem;
+		operand.value = 0;
+		break;
+	}
+
+	return operand;
+}
+
 std::vector<Instruction> process(std::istream &is) {
 	std::vector<Instruction> ret;
 
@@ -107,44 +151,72 @@ std::vector<Instruction> process(std::istream &is) {
 
 		std::string operand_str;
 		while(std::getline(lss, operand_str, ',')) {
-			auto words = split(operand_str, ' ');
-
-			Operand operand;
-
-			switch(words[0][0]) {
-			case '!':
-				std::cerr << "commands not implemented yet" << std::endl;
-				return {};
-			case '#':
-				operand.type = Operand::Type::imm;
-				operand.value = 0;
-				break;
-			case '$':
-				operand.type = Operand::Type::reg;
-				operand.value = 0;
-				break;
-			case '0':
-			case '1':
-			case '2':
-			case '3':
-			case '4':
-			case '5':
-			case '6':
-			case '7':
-			case '8':
-			case '9':
-				operand.type = Operand::Type::mem;
-				operand.value = 0;
+			if(operand_str.find_first_not_of(' ') == std::string::npos) {
 				break;
 			}
 
-			instr.operands.emplace_back(operand);
+			auto words = split(operand_str, ' ');
+
+			if(words.empty()) {
+				std::cerr << "syntax error" << std::endl;
+				std::cerr << '"' << operand_str << '"' << std::endl;
+				return {};
+			}
+
+			if(words[0][0] == '!') {
+				Command command;
+				command.type = Command::Type::eq;
+				for(size_t w = 1; w < words.size(); ++w) {
+					command.operands.emplace_back(process_operand(words[w]));
+				}
+				instr.commands.emplace_back(command);
+			} else {
+				instr.operands.emplace_back(process_operand(words[0]));
+			}
 		}
 
 		ret.emplace_back(instr);
 	}
 
 	return ret;
+}
+
+void encode(std::ostream &os, const std::vector<Instruction> &instrs) {
+	for(auto &instr : instrs) {
+		for(auto &command : instr.commands) {
+			uint16_t byte = static_cast<uint16_t>(command.type);
+			byte |= 1u << 15u;
+			std::cout << std::bitset<16>(byte) << ' ';
+			os << HI8(byte) << LO8(byte);
+
+			for(auto &operand : command.operands) {
+				uint16_t byte = operand.value;
+
+				if(operand.type != Operand::Type::mem) {
+					byte |= static_cast<uint16_t>(operand.type) << 15u;
+				}
+
+				std::cout << std::bitset<16>(byte) << ' ';
+				os << HI8(byte) << LO8(byte);
+			}
+		}
+
+		uint16_t byte = static_cast<uint16_t>(instr.opcode);
+		std::cout << std::bitset<16>(byte);
+		os << HI8(byte) << LO8(byte);
+
+		for(auto &operand : instr.operands) {
+			uint16_t byte = operand.value;
+
+			if(operand.type != Operand::Type::mem) {
+				byte |= static_cast<uint16_t>(operand.type) << 15u;
+			}
+
+			std::cout << ' ' << std::bitset<16>(byte);
+			os << HI8(byte) << LO8(byte);
+		}
+		std::cout << std::endl;
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -168,6 +240,9 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	std::cout << "out_path = " << out_path << std::endl;
+	std::ofstream os(out_path, std::ios::out | std::ios::binary | std::ios::trunc);
+
 	for(size_t i = 0; i < in_count; ++i) {
 		char *in_path = argv[i + optind];
 		std::cout << "in[" << i << "] = " << in_path << std::endl;
@@ -183,15 +258,8 @@ int main(int argc, char *argv[]) {
 			return 2;
 		}
 
-		for(auto &instr : instrs) {
-			std::cout << "opcode = " << instr.opcode << std::endl;
-			for(auto &operand : instr.operands) {
-				std::cout << "  operand type = " << operand.type << " value = " << operand.value << std::endl;
-			}
-		}
+		encode(os, instrs);
 	}
-
-	std::cout << "out_path = " << out_path << std::endl;
 
 	return 0;
 }
