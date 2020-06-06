@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <bitset>
+#include <charconv>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -44,17 +45,52 @@ std::vector<std::string_view> split(std::string_view sv, char delim) {
 	return ret;
 }
 
+uint16_t parse_literal(std::string_view sv) {
+	if(sv.empty()) {
+		std::cerr << "error: expected numeric literal" << std::endl;
+		return 0;
+	}
+
+	int base = 10;
+
+	if(sv[0] == '0') {
+		if(sv.size() >= 2 && (sv[1] == 'X' || sv[1] == 'x')) {
+			base = 16;
+			sv.remove_prefix(2);
+		} else if(sv.size() >= 2 && (sv[1] == 'O' || sv[1] == 'o')) {
+			base = 8;
+			sv.remove_prefix(2);
+		} else if(sv.size() >= 2 && (sv[1] == 'B' || sv[1] == 'b')) {
+			base = 2;
+			sv.remove_prefix(2);
+		} else {
+			base = 8;
+			sv.remove_prefix(1);
+		}
+	}
+
+	uint16_t ret = 0;
+
+	auto result = std::from_chars(sv.data(), sv.data() + sv.size(), ret, base);
+	if(result.ptr == sv.data()) {
+		std::cerr << "error: failed to parse numeric literal" << std::endl;
+		return 0;
+	}
+
+	return ret;
+}
+
 shk::operand process_operand(std::string_view operand_str) {
 	shk::operand operand;
 
 	switch(operand_str[0]) {
 	case '#':
 		operand.ty = shk::operand::type::imm;
-		operand.value = 0;
+		operand.value = parse_literal(operand_str.substr(1));
 		break;
 	case '$':
 		operand.ty = shk::operand::type::reg;
-		operand.value = 0;
+		operand.value = parse_literal(operand_str.substr(1));
 		break;
 	case '0':
 	case '1':
@@ -67,7 +103,7 @@ shk::operand process_operand(std::string_view operand_str) {
 	case '8':
 	case '9':
 		operand.ty = shk::operand::type::mem;
-		operand.value = 0;
+		operand.value = parse_literal(operand_str);
 		break;
 	}
 
