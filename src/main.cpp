@@ -6,7 +6,6 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <unordered_map>
 #include <vector>
 
 #include <shk.h>
@@ -14,26 +13,9 @@
 #define HI8(U16) (static_cast<uint8_t>((U16 & 0xFF00u) >> 8u))
 #define LO8(U16) (static_cast<uint8_t>(U16 & 0x00FFu))
 
-std::ostream & operator<<(std::ostream &os, const shk::opcode opcode) {
-	return os << static_cast<int>(opcode);
-}
-
 std::ostream & operator<<(std::ostream &os, const shk::operand::type type) {
 	return os << static_cast<int>(type);
 }
-
-const std::unordered_map<std::string, shk::opcode> opcode_map {
-	{"NOP", shk::opcode::noop},
-	{"HLT", shk::opcode::halt},
-	{"DIE", shk::opcode::die},
-
-	{"LOD", shk::opcode::load},
-	{"STO", shk::opcode::store},
-
-	{"MOV", shk::opcode::move},
-	{"ADD", shk::opcode::add},
-	{"CMP", shk::opcode::compare},
-};
 
 std::vector<std::string_view> split(std::string_view sv, char delim) {
 	std::vector<std::string_view> ret;
@@ -102,14 +84,14 @@ std::vector<shk::instruction> process(std::istream &is) {
 		std::string opcode_str;
 		lss >> opcode_str;
 
-		auto it = opcode_map.find(opcode_str);
-		if(it == opcode_map.end()) {
+		auto opcode = shk::mnemonic_to_opcode(opcode_str);
+		if(!opcode) {
 			std::cerr << opcode_str << ": invalid opcode" << std::endl;
 			return {};
 		}
 
 		shk::instruction instr;
-		instr.op = it->second;
+		instr.op = *opcode;
 
 		std::string operand_str;
 		while(std::getline(lss, operand_str, ',')) {
@@ -143,42 +125,40 @@ std::vector<shk::instruction> process(std::istream &is) {
 	return ret;
 }
 
-void encode(std::ostream &os, const std::vector<shk::instruction> &instrs) {
-	for(auto &instr : instrs) {
-		for(auto &command : instr.commands) {
-			uint16_t byte = static_cast<uint16_t>(command.ty);
-			byte |= 1u << 15u;
-			std::cout << std::bitset<16>(byte) << ' ';
-			os << HI8(byte) << LO8(byte);
-
-			for(auto &operand : command.operands) {
-				uint16_t byte = operand.value;
-
-				if(operand.ty != shk::operand::type::mem) {
-					byte |= static_cast<uint16_t>(operand.ty) << 15u;
-				}
-
-				std::cout << std::bitset<16>(byte) << ' ';
-				os << HI8(byte) << LO8(byte);
-			}
-		}
-
-		uint16_t byte = static_cast<uint16_t>(instr.op);
-		std::cout << std::bitset<16>(byte);
+void encode(std::ostream &os, const shk::instruction &instr) {
+	for(auto &command : instr.commands) {
+		uint16_t byte = static_cast<uint16_t>(command.ty);
+		byte |= 1u << 15u;
+		std::cout << std::bitset<16>(byte) << ' ';
 		os << HI8(byte) << LO8(byte);
 
-		for(auto &operand : instr.operands) {
+		for(auto &operand : command.operands) {
 			uint16_t byte = operand.value;
 
 			if(operand.ty != shk::operand::type::mem) {
 				byte |= static_cast<uint16_t>(operand.ty) << 15u;
 			}
 
-			std::cout << ' ' << std::bitset<16>(byte);
+			std::cout << std::bitset<16>(byte) << ' ';
 			os << HI8(byte) << LO8(byte);
 		}
-		std::cout << std::endl;
 	}
+
+	uint16_t byte = static_cast<uint16_t>(instr.op);
+	std::cout << std::bitset<16>(byte);
+	os << HI8(byte) << LO8(byte);
+
+	for(auto &operand : instr.operands) {
+		uint16_t byte = operand.value;
+
+		if(operand.ty != shk::operand::type::mem) {
+			byte |= static_cast<uint16_t>(operand.ty) << 15u;
+		}
+
+		std::cout << ' ' << std::bitset<16>(byte);
+		os << HI8(byte) << LO8(byte);
+	}
+	std::cout << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -220,7 +200,9 @@ int main(int argc, char *argv[]) {
 			return 2;
 		}
 
-		encode(os, instrs);
+		for(auto &instr : instrs) {
+			encode(os, instr);
+		}
 	}
 
 	return 0;
