@@ -53,14 +53,14 @@ uint16_t parse_literal(std::string_view sv) {
 
 	int base = 10;
 
-	if(sv[0] == '0') {
-		if(sv.size() >= 2 && (sv[1] == 'X' || sv[1] == 'x')) {
+	if(sv[0] == '0' && sv.size() >= 2) {
+		if(sv[1] == 'X' || sv[1] == 'x') {
 			base = 16;
 			sv.remove_prefix(2);
-		} else if(sv.size() >= 2 && (sv[1] == 'O' || sv[1] == 'o')) {
+		} else if(sv[1] == 'O' || sv[1] == 'o') {
 			base = 8;
 			sv.remove_prefix(2);
-		} else if(sv.size() >= 2 && (sv[1] == 'B' || sv[1] == 'b')) {
+		} else if(sv[1] == 'B' || sv[1] == 'b') {
 			base = 2;
 			sv.remove_prefix(2);
 		} else {
