@@ -120,6 +120,10 @@ std::vector<shk::instruction> process(std::istream &is) {
 		std::string opcode_str;
 		lss >> opcode_str;
 
+		if(opcode_str.empty()) {
+			continue;
+		}
+
 		auto opcode = shk::mnemonic_to_opcode(opcode_str);
 		if(!opcode) {
 			std::cerr << opcode_str << ": invalid opcode" << std::endl;
