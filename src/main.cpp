@@ -147,8 +147,15 @@ std::vector<shk::instruction> process(std::istream &is) {
 			}
 
 			if(words[0][0] == '!') {
+				std::string command_str(words[0].substr(1));
+				auto command_ty = shk::mnemonic_to_command(command_str);
+				if(!command_ty) {
+					std::cerr << "error: " << command_str << ": invalid command" << std::endl;
+					return {};
+				}
+
 				shk::command command;
-				command.ty = shk::command::type::eq;
+				command.ty = *command_ty;
 				for(size_t w = 1; w < words.size(); ++w) {
 					command.operands.emplace_back(process_operand(words[w]));
 				}
