@@ -102,8 +102,7 @@ shk::operand process_operand(std::string_view operand_str) {
 	case '7':
 	case '8':
 	case '9':
-		operand.ty = shk::operand::type::mem;
-		operand.value = parse_literal(operand_str);
+		std::cerr << "error: unqualified numeric literal" << std::endl;
 		break;
 	}
 
@@ -126,7 +125,7 @@ std::vector<shk::instruction> process(std::istream &is) {
 
 		auto opcode = shk::mnemonic_to_opcode(opcode_str);
 		if(!opcode) {
-			std::cerr << opcode_str << ": invalid opcode" << std::endl;
+			std::cerr << "error: " << opcode_str << ": invalid opcode" << std::endl;
 			return {};
 		}
 
@@ -142,7 +141,7 @@ std::vector<shk::instruction> process(std::istream &is) {
 			auto words = split(operand_str, ' ');
 
 			if(words.empty()) {
-				std::cerr << "syntax error" << std::endl;
+				std::cerr << "error: syntax: ";
 				std::cerr << '"' << operand_str << '"' << std::endl;
 				return {};
 			}
@@ -174,10 +173,7 @@ void encode(std::ostream &os, const shk::instruction &instr) {
 
 		for(auto &operand : command.operands) {
 			uint16_t byte = operand.value;
-
-			if(operand.ty != shk::operand::type::mem) {
-				byte |= static_cast<uint16_t>(operand.ty) << 15u;
-			}
+			byte |= static_cast<uint16_t>(operand.ty) << 15u;
 
 			std::cout << std::bitset<16>(byte) << ' ';
 			os << HI8(byte) << LO8(byte);
@@ -190,10 +186,7 @@ void encode(std::ostream &os, const shk::instruction &instr) {
 
 	for(auto &operand : instr.operands) {
 		uint16_t byte = operand.value;
-
-		if(operand.ty != shk::operand::type::mem) {
-			byte |= static_cast<uint16_t>(operand.ty) << 15u;
-		}
+		byte |= static_cast<uint16_t>(operand.ty) << 15u;
 
 		std::cout << ' ' << std::bitset<16>(byte);
 		os << HI8(byte) << LO8(byte);
