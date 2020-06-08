@@ -86,11 +86,12 @@ shk::operand process_operand(std::string_view operand_str) {
 	switch(operand_str[0]) {
 	case '#':
 		operand.ty = shk::operand::type::imm;
-		operand.value = parse_literal(operand_str.substr(1));
 		break;
 	case '$':
 		operand.ty = shk::operand::type::reg;
-		operand.value = parse_literal(operand_str.substr(1));
+		break;
+	case '*':
+		operand.ty = shk::operand::type::deref;
 		break;
 	case '0':
 	case '1':
@@ -106,6 +107,7 @@ shk::operand process_operand(std::string_view operand_str) {
 		break;
 	}
 
+	operand.value = parse_literal(operand_str.substr(1));
 	return operand;
 }
 
@@ -180,7 +182,7 @@ void encode(std::ostream &os, const shk::instruction &instr) {
 
 		for(auto &operand : command.operands) {
 			uint16_t byte = operand.value;
-			byte |= static_cast<uint16_t>(operand.ty) << 15u;
+			byte |= static_cast<uint16_t>(operand.ty) << 14u;
 
 			std::cout << std::bitset<16>(byte) << ' ';
 			os << HI8(byte) << LO8(byte);
@@ -193,7 +195,7 @@ void encode(std::ostream &os, const shk::instruction &instr) {
 
 	for(auto &operand : instr.operands) {
 		uint16_t byte = operand.value;
-		byte |= static_cast<uint16_t>(operand.ty) << 15u;
+		byte |= static_cast<uint16_t>(operand.ty) << 14u;
 
 		std::cout << ' ' << std::bitset<16>(byte);
 		os << HI8(byte) << LO8(byte);
