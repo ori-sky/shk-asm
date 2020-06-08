@@ -18,7 +18,7 @@ std::ostream & operator<<(std::ostream &os, const shk::operand::type type) {
 	return os << static_cast<int>(type);
 }
 
-std::vector<std::string_view> split(std::string_view sv, char delim) {
+std::vector<std::string_view> split(std::string_view sv, char delim, int max_splits = 0) {
 	std::vector<std::string_view> ret;
 
 	size_t i = 0;
@@ -31,10 +31,14 @@ std::vector<std::string_view> split(std::string_view sv, char delim) {
 	size_t count;
 
 	for(count = 0; first + count < sv.size(); ++count) {
-		if(sv[first + count] == ' ') {
+		if(sv[first + count] == delim) {
 			ret.emplace_back(sv.substr(first, count));
 			first = first + count + 1;
 			count = 0;
+
+			if(max_splits && ret.size() >= max_splits) {
+				count = sv.size() - first;
+			}
 		}
 	}
 
@@ -73,7 +77,7 @@ uint16_t parse_literal(std::string_view sv) {
 
 	auto result = std::from_chars(sv.data(), sv.data() + sv.size(), ret, base);
 	if(result.ptr == sv.data()) {
-		std::cerr << "error: failed to parse numeric literal" << std::endl;
+		std::cerr << "error: failed to parse numeric literal: " << sv << std::endl;
 		return 0;
 	}
 
@@ -116,14 +120,19 @@ std::vector<shk::instruction> process(std::istream &is) {
 
 	std::string line;
 	while(std::getline(is, line)) {
-		std::istringstream lss(line);
+		auto comment_split = split(line, ';', 1);
 
-		std::string opcode_str;
-		lss >> opcode_str;
-
-		if(opcode_str.empty()) {
+		if(comment_split.empty()) {
 			continue;
 		}
+
+		auto mnemonic_split = split(comment_split[0], ' ', 1);
+
+		if(mnemonic_split.empty()) {
+			continue;
+		}
+
+		auto opcode_str = mnemonic_split[0];
 
 		auto opcode = shk::mnemonic_to_opcode(opcode_str);
 		if(!opcode) {
@@ -134,36 +143,38 @@ std::vector<shk::instruction> process(std::istream &is) {
 		shk::instruction instr;
 		instr.op = *opcode;
 
-		std::string operand_str;
-		while(std::getline(lss, operand_str, ',')) {
-			if(operand_str.find_first_not_of(' ') == std::string::npos) {
-				break;
-			}
+		if(mnemonic_split.size() >= 2) {
+			auto operand_split = split(mnemonic_split[1], ',');
+			for(auto &operand_str : operand_split) {
+				if(operand_str.find_first_not_of(' ') == std::string::npos) {
+					break;
+				}
 
-			auto words = split(operand_str, ' ');
+				auto words = split(operand_str, ' ');
 
-			if(words.empty()) {
-				std::cerr << "error: syntax: ";
-				std::cerr << '"' << operand_str << '"' << std::endl;
-				return {};
-			}
-
-			if(words[0][0] == '!') {
-				std::string command_str(words[0].substr(1));
-				auto command_ty = shk::mnemonic_to_command(command_str);
-				if(!command_ty) {
-					std::cerr << "error: " << command_str << ": invalid command" << std::endl;
+				if(words.empty()) {
+					std::cerr << "error: syntax: ";
+					std::cerr << '"' << operand_str << '"' << std::endl;
 					return {};
 				}
 
-				shk::command command;
-				command.ty = *command_ty;
-				for(size_t w = 1; w < words.size(); ++w) {
-					command.operands.emplace_back(process_operand(words[w]));
+				if(words[0][0] == '!') {
+					std::string command_str(words[0].substr(1));
+					auto command_ty = shk::mnemonic_to_command(command_str);
+					if(!command_ty) {
+						std::cerr << "error: " << command_str << ": invalid command" << std::endl;
+						return {};
+					}
+
+					shk::command command;
+					command.ty = *command_ty;
+					for(size_t w = 1; w < words.size(); ++w) {
+						command.operands.emplace_back(process_operand(words[w]));
+					}
+					instr.commands.emplace_back(command);
+				} else {
+					instr.operands.emplace_back(process_operand(words[0]));
 				}
-				instr.commands.emplace_back(command);
-			} else {
-				instr.operands.emplace_back(process_operand(words[0]));
 			}
 		}
 
