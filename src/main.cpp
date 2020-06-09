@@ -48,6 +48,7 @@ int main(int argc, char *argv[]) {
 	std::cout << "out_path = " << out_path << std::endl;
 	std::ofstream os(out_path, std::ios::out | std::ios::binary | std::ios::trunc);
 
+	as.resolve();
 	as.encode(os);
 
 	return 0;

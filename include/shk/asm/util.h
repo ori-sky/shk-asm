@@ -9,16 +9,20 @@
 #define LO8(U16) (static_cast<uint8_t>(U16 & 0x00FFu))
 
 namespace shk {
-	std::vector<std::string_view> split(std::string_view sv, char delim, int max_splits = 0) {
-		std::vector<std::string_view> ret;
-
+	std::string_view trim(std::string_view sv, char delim = ' ') {
 		size_t i = 0;
-
 		while(sv.size() >= i && sv[i] == delim) {
 			++i;
 		}
+		return sv.substr(i);
+	}
 
-		size_t first = i;
+	std::vector<std::string_view> split(std::string_view sv, char delim = ' ', int max_splits = 0) {
+		std::vector<std::string_view> ret;
+
+		sv = trim(sv, delim);
+
+		size_t first = 0;
 		size_t count;
 
 		for(count = 0; first + count < sv.size(); ++count) {
@@ -75,18 +79,21 @@ namespace shk {
 		return ret;
 	}
 
-	shk::operand parse_operand(std::string_view sv) {
-		shk::operand operand;
+	operand parse_operand(std::string_view sv) {
+		operand oper;
 
 		switch(sv[0]) {
 		case '#':
-			operand.ty = shk::operand::type::imm;
+			oper.ty = operand::type::imm;
+			oper.value = parse_literal(sv.substr(1));
 			break;
 		case '$':
-			operand.ty = shk::operand::type::reg;
+			oper.ty = operand::type::reg;
+			oper.value = parse_literal(sv.substr(1));
 			break;
 		case '*':
-			operand.ty = shk::operand::type::deref;
+			oper.ty = operand::type::deref;
+			oper.value = parse_literal(sv.substr(1));
 			break;
 		case '0':
 		case '1':
@@ -100,9 +107,12 @@ namespace shk {
 		case '9':
 			std::cerr << "error: unqualified numeric literal" << std::endl;
 			break;
+		default:
+			oper.ty = operand::type::label;
+			oper.label = sv;
+			break;
 		}
 
-		operand.value = shk::parse_literal(sv.substr(1));
-		return operand;
+		return oper;
 	}
 } // namespace shk
