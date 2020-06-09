@@ -20,7 +20,7 @@ namespace shk {
 	std::vector<std::string_view> split(std::string_view sv, char delim = ' ', int max_splits = 0) {
 		std::vector<std::string_view> ret;
 
-		sv = trim(sv, delim);
+		sv = trim(sv, ' ');
 
 		size_t first = 0;
 		size_t count;

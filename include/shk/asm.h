@@ -112,15 +112,7 @@ namespace shk {
 			uint16_t addr = 0;
 			for(auto &instr : instrs) {
 				addrs.emplace_back(addr);
-
-				if(instr.op != opcode::data) {
-					++addr;
-				}
-				addr += instr.operands.size();
-				for(auto &cmd : instr.commands) {
-					++addr;
-					addr += cmd.operands.size();
-				}
+				addr += instr.size();
 			}
 
 			for(size_t i = 0; i < instrs.size(); ++i) {
