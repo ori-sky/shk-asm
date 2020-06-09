@@ -113,7 +113,9 @@ namespace shk {
 			for(auto &instr : instrs) {
 				addrs.emplace_back(addr);
 
-				++addr;
+				if(instr.op != opcode::data) {
+					++addr;
+				}
 				addr += instr.operands.size();
 				for(auto &cmd : instr.commands) {
 					++addr;
@@ -170,9 +172,11 @@ namespace shk {
 				std::cout << ' ';
 			}
 
-			uint16_t byte = static_cast<uint16_t>(instr.op);
-			std::cout << std::bitset<16>(byte);
-			os << HI8(byte) << LO8(byte);
+			if(instr.op != opcode::data) {
+				uint16_t byte = static_cast<uint16_t>(instr.op);
+				std::cout << std::bitset<16>(byte);
+				os << HI8(byte) << LO8(byte);
+			}
 
 			for(auto &oper : instr.operands) {
 				if(!encode_operand(os, oper)) {
