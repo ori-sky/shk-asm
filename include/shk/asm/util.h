@@ -1,5 +1,10 @@
 #pragma once
 
+#include <charconv>
+#include <vector>
+
+#include <shk.h>
+
 #define HI8(U16) (static_cast<uint8_t>((U16 & 0xFF00u) >> 8u))
 #define LO8(U16) (static_cast<uint8_t>(U16 & 0x00FFu))
 
@@ -68,5 +73,36 @@ namespace shk {
 		}
 
 		return ret;
+	}
+
+	shk::operand parse_operand(std::string_view sv) {
+		shk::operand operand;
+
+		switch(sv[0]) {
+		case '#':
+			operand.ty = shk::operand::type::imm;
+			break;
+		case '$':
+			operand.ty = shk::operand::type::reg;
+			break;
+		case '*':
+			operand.ty = shk::operand::type::deref;
+			break;
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':
+			std::cerr << "error: unqualified numeric literal" << std::endl;
+			break;
+		}
+
+		operand.value = shk::parse_literal(sv.substr(1));
+		return operand;
 	}
 } // namespace shk
