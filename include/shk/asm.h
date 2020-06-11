@@ -17,81 +17,86 @@ namespace shk {
 
 		assembler(bool verbose = false) : verbose(verbose) {}
 
+		std::optional<instruction> process_one(std::string_view line) {
+			auto comment_split = split(line, ';', 1);
+
+			if(comment_split.empty()) {
+				return {};
+			}
+
+			auto mnemonic_split = split(comment_split[0], ' ', 1);
+
+			if(mnemonic_split.empty()) {
+				return {};
+			}
+
+			if(mnemonic_split[0].back() == ':') {
+				auto label = mnemonic_split[0];
+				label.remove_suffix(1);
+
+				if(verbose) {
+					std::cout << "label " << label << " at " << instrs.size() << std::endl;
+				}
+				labels.emplace(label, instrs.size());
+
+				return process_one(mnemonic_split[1]);
+			}
+
+			auto opcode_str = mnemonic_split[0];
+
+			auto opcode = mnemonic_to_opcode(opcode_str);
+			if(!opcode) {
+				std::cerr << "error: " << opcode_str << ": invalid opcode" << std::endl;
+				return {};
+			}
+
+			instruction instr;
+			instr.op = *opcode;
+
+			if(mnemonic_split.size() >= 2) {
+				auto operand_split = split(mnemonic_split[1], ',');
+				for(auto &operand_str : operand_split) {
+					if(operand_str.find_first_not_of(' ') == std::string::npos) {
+						break;
+					}
+
+					auto words = split(operand_str, ' ');
+
+					if(words.empty()) {
+						std::cerr << "error: syntax: ";
+						std::cerr << '"' << operand_str << '"' << std::endl;
+						return {};
+					}
+
+					if(words[0][0] == '!') {
+						std::string command_str(words[0].substr(1));
+						auto command_ty = mnemonic_to_command(command_str);
+						if(!command_ty) {
+							std::cerr << "error: " << command_str << ": invalid command" << std::endl;
+							return {};
+						}
+
+						command cmd;
+						cmd.ty = *command_ty;
+						for(size_t w = 1; w < words.size(); ++w) {
+							cmd.operands.emplace_back(parse_operand(words[w]));
+						}
+						instr.commands.emplace_back(std::move(cmd));
+					} else {
+						instr.operands.emplace_back(parse_operand(words[0]));
+					}
+				}
+			}
+
+			return instr;
+		}
+
 		bool process(std::istream &is) {
 			std::string line;
 			while(std::getline(is, line)) {
-				auto comment_split = split(line, ';', 1);
-
-				if(comment_split.empty()) {
-					continue;
+				if(auto instr = process_one(line)) {
+					instrs.emplace_back(std::move(*instr));
 				}
-
-				auto label_split = split(comment_split[0], ':');
-
-				if(label_split.empty()) {
-					continue;
-				}
-
-				for(auto it = label_split.begin(); it != label_split.end() - 1; ++it) {
-					if(verbose) {
-						std::cout << "label " << trim(*it) << " at " << instrs.size() << std::endl;
-					}
-					labels.emplace(trim(*it), instrs.size());
-				}
-
-				auto mnemonic_split = split(label_split.back(), ' ', 1);
-
-				if(mnemonic_split.empty()) {
-					continue;
-				}
-
-				auto opcode_str = mnemonic_split[0];
-
-				auto opcode = mnemonic_to_opcode(opcode_str);
-				if(!opcode) {
-					std::cerr << "error: " << opcode_str << ": invalid opcode" << std::endl;
-					return {};
-				}
-
-				instruction instr;
-				instr.op = *opcode;
-
-				if(mnemonic_split.size() >= 2) {
-					auto operand_split = split(mnemonic_split[1], ',');
-					for(auto &operand_str : operand_split) {
-						if(operand_str.find_first_not_of(' ') == std::string::npos) {
-							break;
-						}
-
-						auto words = split(operand_str, ' ');
-
-						if(words.empty()) {
-							std::cerr << "error: syntax: ";
-							std::cerr << '"' << operand_str << '"' << std::endl;
-							return false;
-						}
-
-						if(words[0][0] == '!') {
-							std::string command_str(words[0].substr(1));
-							auto command_ty = mnemonic_to_command(command_str);
-							if(!command_ty) {
-								std::cerr << "error: " << command_str << ": invalid command" << std::endl;
-								return false;
-							}
-
-							command cmd;
-							cmd.ty = *command_ty;
-							for(size_t w = 1; w < words.size(); ++w) {
-								cmd.operands.emplace_back(parse_operand(words[w]));
-							}
-							instr.commands.emplace_back(cmd);
-						} else {
-							instr.operands.emplace_back(parse_operand(words[0]));
-						}
-					}
-				}
-
-				instrs.emplace_back(instr);
 			}
 
 			return true;
