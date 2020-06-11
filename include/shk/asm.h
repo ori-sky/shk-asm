@@ -13,6 +13,10 @@ namespace shk {
 		std::vector<instruction> instrs;
 		std::unordered_map<std::string, size_t> labels;
 	  public:
+		bool verbose;
+
+		assembler(bool verbose = false) : verbose(verbose) {}
+
 		bool process(std::istream &is) {
 			std::string line;
 			while(std::getline(is, line)) {
@@ -29,7 +33,9 @@ namespace shk {
 				}
 
 				for(auto it = label_split.begin(); it != label_split.end() - 1; ++it) {
-					std::cout << "label " << trim(*it) << " at " << instrs.size() << std::endl;
+					if(verbose) {
+						std::cout << "label " << trim(*it) << " at " << instrs.size() << std::endl;
+					}
 					labels.emplace(trim(*it), instrs.size());
 				}
 
@@ -142,7 +148,9 @@ namespace shk {
 			uint16_t byte = oper.value;
 			byte |= static_cast<uint16_t>(oper.ty) << 14u;
 
-			std::cout << ' ' << std::bitset<16>(byte);
+			if(verbose) {
+				std::cout << ' ' << std::bitset<16>(byte);
+			}
 			os << HI8(byte) << LO8(byte);
 
 			return true;
@@ -152,7 +160,9 @@ namespace shk {
 			for(auto &cmd : instr.commands) {
 				uint16_t byte = static_cast<uint16_t>(cmd.ty);
 				byte |= 1u << 15u;
-				std::cout << std::bitset<16>(byte);
+				if(verbose) {
+					std::cout << std::bitset<16>(byte);
+				}
 				os << HI8(byte) << LO8(byte);
 
 				for(auto &oper : cmd.operands) {
@@ -161,12 +171,16 @@ namespace shk {
 					}
 				}
 
-				std::cout << ' ';
+				if(verbose) {
+					std::cout << ' ';
+				}
 			}
 
 			if(instr.op != opcode::data) {
 				uint16_t byte = static_cast<uint16_t>(instr.op);
-				std::cout << std::bitset<16>(byte);
+				if(verbose) {
+					std::cout << std::bitset<16>(byte);
+				}
 				os << HI8(byte) << LO8(byte);
 			}
 
@@ -175,7 +189,9 @@ namespace shk {
 					return false;
 				}
 			}
-			std::cout << std::endl;
+			if(verbose) {
+				std::cout << std::endl;
+			}
 
 			return true;
 		}

@@ -11,11 +11,16 @@ int main(int argc, char *argv[]) {
 	char out_path[PATH_MAX];
 	strcpy(out_path, "a.out");
 
+	bool verbose = false;
+
 	int opt;
-	while((opt = getopt(argc, argv, "o:")) != -1) {
+	while((opt = getopt(argc, argv, "o:v")) != -1) {
 		switch(opt) {
 		case 'o':
 			strcpy(out_path, optarg);
+			break;
+		case 'v':
+			verbose = true;
 			break;
 		case '?':
 			return 1;
@@ -28,11 +33,13 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	shk::assembler as;
+	shk::assembler as(verbose);
 
 	for(size_t i = 0; i < in_count; ++i) {
 		char *in_path = argv[i + optind];
-		std::cout << "in[" << i << "] = " << in_path << std::endl;
+		if(verbose) {
+			std::cout << "in[" << i << "] = " << in_path << std::endl;
+		}
 
 		std::ifstream is(in_path, std::ios::in);
 		if(is.fail()) {
@@ -45,10 +52,14 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	std::cout << "out_path = " << out_path << std::endl;
+	as.resolve();
+
+	if(verbose) {
+		std::cout << "out_path = " << out_path << std::endl;
+	}
+
 	std::ofstream os(out_path, std::ios::out | std::ios::binary | std::ios::trunc);
 
-	as.resolve();
 	as.encode(os);
 
 	return 0;
