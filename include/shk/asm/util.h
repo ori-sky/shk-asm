@@ -11,7 +11,7 @@
 namespace shk {
 	std::string_view trim(std::string_view sv, char delim = ' ') {
 		size_t i = 0;
-		while(sv.size() >= i && sv[i] == delim) {
+		while(sv.size() > i && sv[i] == delim) {
 			++i;
 		}
 		return sv.substr(i);
