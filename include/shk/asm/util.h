@@ -79,7 +79,7 @@ namespace shk {
 		return ret;
 	}
 
-	operand parse_operand(std::string_view sv) {
+	operand parse_operand_part(std::string_view sv) {
 		operand oper;
 
 		switch(sv[0]) {
@@ -114,5 +114,21 @@ namespace shk {
 		}
 
 		return oper;
+	}
+
+	operand parse_operand(std::string_view sv) {
+		auto segment_split = split(sv, ':', 1);
+
+		if(segment_split.empty()) {
+			std::cerr << "error: missing operand" << std::endl;
+		}
+
+		if(segment_split.size() > 1) {
+			auto oper = parse_operand_part(segment_split[1]);
+			oper.segment = std::make_unique<operand>(parse_operand_part(segment_split[0]));
+			return oper;
+		} else {
+			return parse_operand_part(segment_split[0]);
+		}
 	}
 } // namespace shk

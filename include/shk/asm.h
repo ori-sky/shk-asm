@@ -144,14 +144,23 @@ namespace shk {
 			return true;
 		}
 
-		bool encode_operand(std::ostream &os, const operand &oper) const {
+		bool encode_operand(std::ostream &os, const operand &oper, bool segment = false) const {
 			if(oper.ty == operand::type::label) {
 				std::cerr << "error: unresolved label " << oper.label << std::endl;
 				return false;
 			}
 
+			if(oper.segment) {
+				if(!encode_operand(os, *oper.segment, true)) {
+					return false;
+				}
+			}
+
 			uint16_t byte = oper.value;
-			byte |= static_cast<uint16_t>(oper.ty) << 14u;
+			byte |= static_cast<uint16_t>(oper.ty) << 12u;
+			if(segment) {
+				byte |= 1 << 15u;
+			}
 
 			if(verbose) {
 				std::cout << ' ' << std::bitset<16>(byte);
