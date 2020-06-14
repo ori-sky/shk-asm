@@ -8,5 +8,6 @@ itoa.loop:
   DIV $10, $10, #10
   BRA itoa.loop, !NE $10
 itoa.end:
+  STO $1, #0
   CAL strrev
   RET
