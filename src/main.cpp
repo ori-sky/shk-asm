@@ -47,9 +47,7 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 
-		if(!as.process(is)) {
-			return 2;
-		}
+		as.process(is);
 	}
 
 	as.resolve();

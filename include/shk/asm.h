@@ -5,7 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include <shk/asm/util.h>
+#include <shk.h>
+#include <shk/util.h>
 
 namespace shk {
 	class assembler {
@@ -44,14 +45,8 @@ namespace shk {
 
 			auto opcode_str = mnemonic_split[0];
 
-			auto opcode = mnemonic_to_opcode(opcode_str);
-			if(!opcode) {
-				std::cerr << "error: " << opcode_str << ": invalid opcode" << std::endl;
-				return {};
-			}
-
 			instruction instr;
-			instr.op = *opcode;
+			instr.op = mnemonic_to_opcode(opcode_str);
 
 			if(mnemonic_split.size() >= 2) {
 				auto operand_split = split(mnemonic_split[1], ',');
@@ -63,21 +58,15 @@ namespace shk {
 					auto words = split(operand_str, ' ');
 
 					if(words.empty()) {
-						std::cerr << "error: syntax: ";
-						std::cerr << '"' << operand_str << '"' << std::endl;
-						return {};
+						throw std::runtime_error("syntax error: " + std::string(operand_str));
 					}
 
 					if(words[0][0] == '!') {
 						std::string command_str(words[0].substr(1));
-						auto command_ty = mnemonic_to_command(command_str);
-						if(!command_ty) {
-							std::cerr << "error: " << command_str << ": invalid command" << std::endl;
-							return {};
-						}
 
 						command cmd;
-						cmd.ty = *command_ty;
+						cmd.ty = mnemonic_to_command(command_str);
+
 						for(size_t w = 1; w < words.size(); ++w) {
 							cmd.operands.emplace_back(parse_operand(words[w]));
 						}
@@ -91,33 +80,28 @@ namespace shk {
 			return instr;
 		}
 
-		bool process(std::istream &is) {
+		void process(std::istream &is) {
 			std::string line;
 			while(std::getline(is, line)) {
 				if(auto instr = process_one(line)) {
 					instrs.emplace_back(std::move(*instr));
 				}
 			}
-
-			return true;
 		}
 
-		bool resolve_operand(const std::vector<uint16_t> &addrs, operand &oper) {
+		void resolve_operand(const std::vector<uint16_t> &addrs, operand &oper) {
 			if(oper.ty == operand::type::label) {
 				auto it = labels.find(oper.label);
 				if(it == labels.end()) {
-					std::cerr << "error: " << oper.label << ": unknown label" << std::endl;
-					return false;
+					throw std::runtime_error("unknown label: " + oper.label);
 				}
 
 				oper.ty = operand::type::imm;
 				oper.value = addrs[it->second];
 			}
-
-			return true;
 		}
 
-		bool resolve() {
+		void resolve() {
 			std::vector<uint16_t> addrs;
 
 			uint16_t addr = 0;
@@ -128,32 +112,24 @@ namespace shk {
 
 			for(size_t i = 0; i < instrs.size(); ++i) {
 				for(auto &oper : instrs[i].operands) {
-					if(!resolve_operand(addrs, oper)) {
-						return false;
-					}
+					resolve_operand(addrs, oper);
 				}
+
 				for(auto &cmd : instrs[i].commands) {
 					for(auto &oper : cmd.operands) {
-						if(!resolve_operand(addrs, oper)) {
-							return false;
-						}
+						resolve_operand(addrs, oper);
 					}
 				}
 			}
-
-			return true;
 		}
 
-		bool encode_operand(std::ostream &os, const operand &oper, bool segment = false) const {
+		void encode_operand(std::ostream &os, const operand &oper, bool segment = false) const {
 			if(oper.ty == operand::type::label) {
-				std::cerr << "error: unresolved label " << oper.label << std::endl;
-				return false;
+				throw std::runtime_error("unresolved label: " + oper.label);
 			}
 
 			if(oper.segment) {
-				if(!encode_operand(os, *oper.segment, true)) {
-					return false;
-				}
+				encode_operand(os, *oper.segment, true);
 			}
 
 			uint16_t byte = oper.value;
@@ -166,11 +142,9 @@ namespace shk {
 				std::cout << ' ' << std::bitset<16>(byte);
 			}
 			os << HI8(byte) << LO8(byte);
-
-			return true;
 		}
 
-		bool encode_one(std::ostream &os, const instruction &instr) const {
+		void encode_one(std::ostream &os, const instruction &instr) const {
 			for(auto &cmd : instr.commands) {
 				uint16_t byte = static_cast<uint16_t>(cmd.ty);
 				byte |= 1u << 15u;
@@ -180,9 +154,7 @@ namespace shk {
 				os << HI8(byte) << LO8(byte);
 
 				for(auto &oper : cmd.operands) {
-					if(!encode_operand(os, oper)) {
-						return false;
-					}
+					encode_operand(os, oper);
 				}
 
 				if(verbose) {
@@ -199,24 +171,18 @@ namespace shk {
 			}
 
 			for(auto &oper : instr.operands) {
-				if(!encode_operand(os, oper)) {
-					return false;
-				}
+				encode_operand(os, oper);
 			}
+
 			if(verbose) {
 				std::cout << std::endl;
 			}
-
-			return true;
 		}
 
-		bool encode(std::ostream &os) const {
+		void encode(std::ostream &os) const {
 			for(auto &instr : instrs) {
-				if(!encode_one(os, instr)) {
-					return false;
-				}
+				encode_one(os, instr);
 			}
-			return true;
 		}
 	};
 } // namespace shk
