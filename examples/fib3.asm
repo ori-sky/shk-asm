@@ -17,15 +17,20 @@ fib.end:
 
 fib_str: DAT #0, #0, #0, #0, #0, #0
 
+in_str:  DAT #105, #110, #32, #61, #32, #0
+
 out_str: DAT #111, #117, #116, #32, #61, #32, #0
 
 main:
 main.loop:
+  MOV $0, in_str
+  CAL puts
+
   CAL getc
   CMP $0, $0, #48
   CAL fib
 
-  LOD $100, #1:#0
+  LOD $100, #1:#0   ; skip newline
 
   MOV $1, fib_str
   CAL itoa
@@ -38,7 +43,7 @@ main.loop:
   MOV $0, #10
   CAL putc
 
-  ;CAL getc ; skip newline
+  ;CAL getc   ; skip newline
   BRA main.loop
 main.end:
   RET
