@@ -32,7 +32,6 @@ main.loop:
 
   MOV $0, out_str
   CAL puts
-  DBG
   MOV $0, fib_str
   CAL puts
 
