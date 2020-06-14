@@ -1,0 +1,10 @@
+MOV $0xfe, #0x000b
+MOV $0, #0xfe
+SIP *0
+
+DIE
+DIE
+DIE
+
+DBG
+DIE
